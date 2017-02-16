@@ -12,6 +12,7 @@ sys.path.append("../")
 from common.gradient import numerical_gradient
 from Layers.Affine import Affine
 from Layers.ReLU import ReLU
+from Layers.BatchNormalization import BatchNormalization
 from Layers.SoftmaxWithLoss import SoftmaxWithLoss
 import numpy as np
 from Optimizers.SGD import SGD
@@ -20,23 +21,27 @@ from Optimizers.AdaGrad import AdaGrad
 
 class NLayerNet:
     def __init__(self,layers_size,weight=0.01):
-        self.create_two_layer_net(layers_size,weight)
+        self.create_N_layer_net(layers_size,weight)
         
-    def create_two_layer_net(self,layers_size,weight):
-        w = []
-        b = []
-        af = []
+    def create_N_layer_net(self,layers_size,weight):
+        #w = []
+        #b = []
+        self.update_layers = []
         #レイヤ生成
         layers = []
         for i in range(len(layers_size) - 1):
-            w.append(weight * np.random.randn(layers_size[i],layers_size[i+1]))
-            b.append(np.zeros(layers_size[i+1]))
-            a = Affine(w = w[i],b = b[i],opt_w = SGD(0.1),opt_b = SGD(0.1))
+            w = weight * np.random.randn(layers_size[i],layers_size[i+1])
+            b = np.zeros(layers_size[i+1])
+            a = Affine(w = w,b = b,opt_w = SGD(0.1),opt_b = SGD(0.1))
             #a = Affine(w = w[i],b = b[i],opt_w = Momentum(rate=0.001),opt_b = Momentum(rate=0.001))
             #a = Affine(w = w[i],b = b[i],opt_w = AdaGrad(rate = 0.001),opt_b = AdaGrad(rate = 0.001))
             #a = Affine(w = w[i],b = b[i],opt_w = Adam(),opt_b = Adam())
-            af.append(a)
+            self.update_layers.append(a)
             layers.append(a)
+            #batch normalizationを挿入する.
+            batch_norm = BatchNormalization(SGD(0.1),SGD(0.1))
+            self.update_layers.append(batch_norm)
+            layers.append(batch_norm)
             layers.append(ReLU())
         
         layers.append(SoftmaxWithLoss())
@@ -51,7 +56,6 @@ class NLayerNet:
         
         self.start_layer = layers[0]
         self.end_layer = layers[-1]
-        self.af_layers = af
         
     def predict(self,x,t):
         #正解ラベルをセットする.
@@ -107,8 +111,6 @@ class NLayerNet:
         
         (result,loss) = self.predict(x,t)
         self.end_layer.backward()
-        #self.af1.updateParam()
-        #self.af2.updateParam()
-        for layer in self.af_layers:
+        for layer in self.update_layers:
             layer.updateParam()
         return loss
